@@ -31,6 +31,12 @@ pub struct SendMessageCommand {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QuitCommand;
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GetHistoryCommand {
+    #[serde(rename = "r")]
+    pub room: String,
+}
+
 /// A user command which can be sent to the server by a single user session.
 /// All commands are processed in the context of the chat server paired with an individual user session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -40,6 +46,7 @@ pub enum UserCommand {
     LeaveRoom(LeaveRoomCommand),
     SendMessage(SendMessageCommand),
     Quit(QuitCommand),
+    GetHistory(GetHistoryCommand),
 }
 
 #[cfg(test)]

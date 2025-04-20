@@ -8,6 +8,8 @@ use comms::{
         client::{CommandWriter, EventStream},
     },
 };
+
+use comms::command::{UserCommand, JoinRoomCommand, GetHistoryCommand};
 use tokio::{
     net::TcpStream,
     sync::{
@@ -89,15 +91,23 @@ impl StateStore {
                             }
                         },
                         Action::SelectRoom { room } => {
-                            if let Some(false) = state.try_set_active_room(room.as_str()).map(|room_data| room_data.has_joined) {
+                            if let Some(false) = state
+                                .try_set_active_room(room.as_str())
+                                .map(|d| d.has_joined)
+                            {
+                                let room_name = room.clone();
                                 command_writer
-                                    .write(&command::UserCommand::JoinRoom(command::JoinRoomCommand {
-                                        room,
+                                    .write(&UserCommand::JoinRoom(JoinRoomCommand {
+                                        room: room_name.clone(),
                                     }))
-                                    .await
-                                    .context("could not join room")?;
-                            }
-                        },
+                                    .await?;
+                                command_writer
+                                    .write(&UserCommand::GetHistory(GetHistoryCommand {
+                                        room: room_name,
+                                    }))
+                                    .await?;
+                            }  // ← close the `if` here
+                        },      // ← now close the match arm
                         Action::Exit => {
                             let _ = terminator.terminate(Interrupted::UserInt);
 

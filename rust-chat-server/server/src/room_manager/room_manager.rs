@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
-
-use comms::event::Event;
+use comms::event::{Event, UserMessageBroadcastEvent};
 use tokio::sync::{broadcast, Mutex};
 
 use super::room::{ChatRoom, ChatRoomMetadata, SessionAndUserId, UserSessionHandle};
@@ -66,4 +65,17 @@ impl RoomManager {
 
         Ok(())
     }
+
+    pub async fn get_history(
+        &self,
+        room_name: &str,
+    ) -> anyhow::Result<Vec<UserMessageBroadcastEvent>> {
+        let room = self
+            .chat_rooms
+            .get(room_name)
+            .ok_or_else(|| anyhow::anyhow!("room '{}' not found", room_name))?;
+        let room = room.lock().await;
+        Ok(room.get_history())
+    }
+    
 }

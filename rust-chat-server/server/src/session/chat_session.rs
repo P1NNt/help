@@ -47,52 +47,55 @@ impl ChatSession {
                     return Err(anyhow::anyhow!("already joined room '{}'", &cmd.room));
                 }
 
-                let (mut broadcast_rx, user_session_handle, user_ids) = self
-                    .room_manager
-                    .join_room(&cmd.room, &self.session_and_user_id)
-                    .await?;
+                let (mut broadcast_rx, user_session_handle, user_ids) =
+                    self.room_manager.join_room(&cmd.room, &self.session_and_user_id).await?;
 
-                // spawn a task to forward broadcast messages to the users' mpsc channel
-                // hence the user can receive messages from different rooms via single channel
                 let abort_handle = self.join_set.spawn({
                     let mpsc_tx = self.mpsc_tx.clone();
-
-                    // start with sending the user joined room event as a reply to the user
+                    // Reply to user with current members
                     mpsc_tx
                         .send(Event::UserJoinedRoom(event::UserJoinedRoomReplyEvent {
                             room: cmd.room.clone(),
                             users: user_ids,
                         }))
                         .await?;
-
                     async move {
-                        while let Ok(event) = broadcast_rx.recv().await {
-                            let _ = mpsc_tx.send(event).await;
+                        while let Ok(evt) = broadcast_rx.recv().await {
+                            let _ = mpsc_tx.send(evt).await;
                         }
                     }
                 });
 
-                // store references to the user session handle and abort handle
-                // this is used to send messages to the room and to cancel the task when user leaves the room
                 self.joined_rooms
                     .insert(cmd.room.clone(), (user_session_handle, abort_handle));
             }
+
             UserCommand::SendMessage(cmd) => {
-                if let Some((user_session_handle, _)) = self.joined_rooms.get(&cmd.room) {
-                    let _ = user_session_handle.send_message(cmd.content);
+                if let Some((handle, _)) = self.joined_rooms.get(&cmd.room) {
+                    // ChatRoom.send_message will record & broadcast
+                    let _ = handle.send_message(cmd.content);
                 }
             }
+
             UserCommand::LeaveRoom(cmd) => {
-                // remove the room from joined rooms and drop user session handle for the room
-                if let Some(urp) = self.joined_rooms.remove(&cmd.room) {
-                    self.cleanup_room(urp).await?;
+                if let Some((handle, abort_handle)) = self.joined_rooms.remove(&cmd.room) {
+                    self.room_manager.drop_user_session_handle(handle).await?;
+                    abort_handle.abort();
                 }
             }
+
+            UserCommand::GetHistory(cmd) => {
+                let msgs = self.room_manager.get_history(&cmd.room).await?;
+                for msg in msgs {
+                    let _ = self.mpsc_tx.send(Event::UserMessage(msg)).await;
+                }
+            }
+
             _ => {}
         }
-
         Ok(())
     }
+
 
     // TODO: optimize the performance of this function. leaving one by one may not be a good idea.
     /// Leave all the rooms the user is currently participating in
