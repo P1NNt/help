@@ -106,8 +106,8 @@ impl StateStore {
                                         room: room_name,
                                     }))
                                     .await?;
-                            }  // ← close the `if` here
-                        },      // ← now close the match arm
+                            }
+                        },
                         Action::Exit => {
                             let _ = terminator.terminate(Interrupted::UserInt);
 
