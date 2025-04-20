@@ -71,10 +71,9 @@ impl ChatSession {
             }
 
             UserCommand::SendMessage(cmd) => {
-                if let Some((handle, _)) = self.joined_rooms.get(&cmd.room) {
-                    // ChatRoom.send_message will record & broadcast
-                    let _ = handle.send_message(cmd.content);
-                }
+                self.room_manager
+                    .send_message(&cmd.room, &self.session_and_user_id, cmd.content)
+                    .await?;
             }
 
             UserCommand::LeaveRoom(cmd) => {

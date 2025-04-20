@@ -77,5 +77,20 @@ impl RoomManager {
         let room = room.lock().await;
         Ok(room.get_history())
     }
+
+    pub async fn send_message(
+        &self,
+        room_name: &str,
+        session_and_user_id: &SessionAndUserId,
+        content: String,
+    ) -> anyhow::Result<()> {
+        let room = self
+            .chat_rooms
+            .get(room_name)
+            .ok_or_else(|| anyhow::anyhow!("room '{}' not found", room_name))?;
+        let mut room = room.lock().await;
+        room.send_message(session_and_user_id, content);
+        Ok(())
+    }
     
 }
